@@ -1,0 +1,315 @@
+---
+title: "Diamond"
+author: "Sanmoy Paul, Sameer Acharaya, Kashyap Bhuva, Jay Bhatt"
+date: "19 January 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Set Working Directory**
+```{r setwd, echo=TRUE} 
+setwd("C:\\F\\NMIMS\\DataScience\\Sem-2\\ML-R")
+```
+
+**Load Libraries**
+```{r LoadLibraries, echo=TRUE}  
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(gridExtra)
+library(plotly)
+library(Hmisc)
+library(corrgram)
+library(caTools)
+``` 
+
+**Read Csv**
+```{r readCSV, echo=TRUE}
+dataset <- read.csv("./data/diamonds.csv", header = T, stringsAsFactors = F)
+```   
+
+**Read First 6 recs**
+```{r ReadFirst, echo=TRUE}
+head(dataset)
+```
+**Read Last 6 recs**
+```{r ReadLast, echo=TRUE}
+tail(dataset)
+```
+
+**Structure of the data frame**
+```{r struc, echo=TRUE}
+str(dataset)
+glimpse(dataset)
+```
+
+**No of Cols**
+```{r nCol, echo=TRUE}
+ncol(dataset)
+```
+
+**No of rows**
+```{r nRow, echo=TRUE}
+nrow(dataset)
+```
+
+**Names**
+```{r colNames, echo=TRUE}
+names(dataset)
+colnames(dataset)
+```  
+
+**Detect NAs**
+```{r detectNA, echo=TRUE}
+detectNAs<-function(x){
+  return(sum(is.na(x)))
+}
+lapply(dataset, detectNAs)
+``` 
+
+**DetectSpace**
+```{r detectSpace, echo=TRUE}
+detectSpace <- function(x){
+  if(class(x)=="character")
+    return(sum(str_trim(x)==""))
+  else
+    return("Not a Character")
+}
+sapply(dataset, detectSpace)
+```  
+
+**Clean Data**
+```{r cleanData, echo=TRUE}
+dataset$cut[str_trim(dataset$cut)==""] <- NA
+dataset$color[str_trim(dataset$color)==""] <- NA
+dataset$clarity[str_trim(dataset$clarity)==""] <- NA
+
+which(is.na(dataset$cut))
+which(is.na(dataset$color))
+which(is.na(dataset$clarity))
+``` 
+**Remove NA's**
+```{r removeNas, echo=TRUE}
+datasetGood <- na.omit(dataset)
+nrow(datasetGood)
+```  
+
+**Summary stat**
+```{r summaryStat, echo=TRUE}
+summary(dataset)
+```  
+
+**Freq dist of Price**
+```{r freqDist, echo=TRUE}
+p1<- ggplot(datasetGood, aes(x=price))+
+  geom_histogram(binwidth = 1)+
+  labs(title="Price Distribution")+
+  labs(x="Price")
+
+p2<-ggplot(datasetGood, aes(x=carat))+
+  geom_histogram(binwidth=0.1)+
+  labs(title="Carat Distribution")+
+  labs(x="Carat")
+
+p3<-ggplot(datasetGood, aes(x=depth))+
+  geom_histogram(binwidth=0.5)+
+  labs(title="Depth Distribution")+
+  labs(x="Depth")
+
+p4<-ggplot(datasetGood, aes(x=table))+
+  geom_histogram(binwidth=0.5)+
+  labs(title="Table Distribution")+
+  labs(x="Table")
+
+grid.arrange(p1, p2, p3, p4, nrow=2, ncol=2)
+``` 
+
+**Comparision of cut with price**
+```{r comparisionGraph, echo=TRUE}
+g1<-ggplot(datasetGood, aes(x=color, y=price))+
+  geom_point(position="jitter")+
+  labs(title="Color v/s Price")+
+  labs(x="Color")+
+  labs(y="Price")
+
+g2<-ggplot(datasetGood, aes(x=color, y=price, fill=color))+
+  geom_bar(stat="identity", position="dodge")+
+  labs(title="Color v/s Price")+
+  labs(x="Color")+
+  labs(y="Price")
+
+
+g3<-ggplot(datasetGood, aes(x=cut, fill=color))+
+  geom_bar(stat="count", position="dodge")+
+  labs(title="Count of Color by Cut")+
+  labs(x="Cut")+
+  labs(y="Color")
+
+g4<-ggplot(datasetGood, aes(x=cut, fill=clarity))+
+  geom_bar(stat="count", position="dodge")+
+  labs(title="Count of Clarity by Cut")+
+  labs(x="Cut")+
+  labs(y="Clarity")
+
+grid.arrange(g1, g2, g3, g4, nrow=2, ncol=2)
+```  
+
+**Chisq Test**
+***H0: Clarity is independent on cut***
+***H1: Clarity is dependent on cut***
+```{r chisqTest, echo=TRUE}
+cTable <- table(datasetGood$cut, datasetGood$clarity)
+cTable
+chisq.test(cTable)
+```  
+***Reject Null Hypothesis at significance level=0.05***
+
+
+**Annova**
+***H0: Price is independent on cut and clarity***
+***H1: Price is dependent on cut and clarity***
+```{r annovaCut&Clarity, echo=TRUE}
+datasetAnn <- datasetGood[, 1:7]
+datasetAnn$cut <- factor(datasetAnn$cut, levels=c("Fair", "Good", "Ideal", "Premium", "Very Good"), labels = c(1,2,3,4,5))
+datasetAnn$clarity <- factor(datasetAnn$clarity, levels=c("I1", "IF", "SI1", "SI2", "VS1", "VS2", "VVS1", "VVS2"), labels = c(1,2,3,4,5,6,7,8))
+datasetAnn$color <- factor(datasetAnn$color, levels=c("D", "E", "F", "G", "H", "I", "J"), labels = c(1,2,3,4,5,6,7))
+annova=aov(price ~ (cut + clarity + cut*clarity), data=datasetAnn)
+summary(annova)
+```  
+***Accept Alt Hypothesis, both cut and clarity is dependent on price***
+
+
+***H0: Price is independent on color and cut***
+***H1: Price is dependent on color and cut***
+```{r annovaCut&Color, echo=TRUE}
+annova=aov(price ~ (cut + color + cut*color), data=datasetAnn)
+summary(annova)
+```  
+***Accept Alt Hypothesis, both cut and color is dependent on price***
+
+**H0: Price is independent on color and clarity**
+**H1: Price is dependent on color and clarity**
+```{r annovaColor&Clarity, echo=TRUE}
+annova=aov(price ~ (color + clarity + color*clarity), data=datasetAnn)
+summary(annova)
+```   
+***Accept Alt Hypothesis, both clarity and color is dependent on price***
+
+
+**Box plot**
+```{r boxPlot, echo=TRUE}
+b1 <- ggplot(datasetAnn, aes(x=cut, y=price)) +
+  geom_boxplot(aes(fill=cut)) +
+  labs(title="cut & price") +
+  labs(x="Cut") +
+  labs(y="Price")
+
+b2 <- ggplot(datasetAnn, aes(x=color, y=price)) +
+  geom_boxplot(aes(fill=color)) +
+  labs(title="color & price") +
+  labs(x="Color") +
+  labs(y="Price")
+
+
+b3 <- ggplot(datasetAnn, aes(x=clarity, y=price)) +
+  geom_boxplot(aes(fill=clarity)) +
+  labs(title="clarity & price") +
+  labs(x="Clarity") +
+  labs(y="Price")
+
+grid.arrange(b1, b2, b3, nrow=3, ncol=1)
+```  
+
+
+**Correlation**
+```{r correlation, echo=TRUE}
+rcorr(as.matrix(datasetAnn))
+```  
+**Correlation Plot**
+```{r correlationPlot, echo=TRUE}
+col.corrgram <- function(ncol){   
+  colorRampPalette(c("darkgoldenrod4", "burlywood1",
+                     "darkkhaki", "darkgreen"))(ncol)} 
+corrgram(datasetAnn, order=TRUE, lower.panel=panel.shade, 
+         upper.panel=panel.pie, text.panel=panel.txt, 
+         main="Correlogram of Car Mileage Data (PC2/PC1 Order)")
+```    
+
+**Multiple Regression**
+***DependentVariable=Price***
+```{r multipleReg, echo=TRUE}
+datasetAnn <- datasetAnn[c(2,3,4,1,5,6,7)]
+set.seed(123)
+```  
+***Split the data into training and test set***
+```{r splittingDataset, echo=TRUE}
+split<-sample.split(datasetAnn$price, SplitRatio = 0.8)
+training_set<-subset(datasetAnn, split==TRUE)
+test_set<-subset(datasetAnn, split==FALSE)
+```  
+
+***Scaling***
+```{r featureScaling, echo=TRUE}
+training_set[,4:7]<-scale(training_set[,4:7])
+test_set[,4:7]<-scale(test_set[, 4:7])
+```  
+***Build Multiple Regression Model***
+```{r modelBuild, echo=TRUE}
+regressor1<- lm(formula=price~., data=training_set)
+summary(regressor1)
+```  
+***predict on test data***
+```{r predict, echo=TRUE}
+y_pred<-predict(regressor1, newdata = test_set)
+head(y_pred)
+```  
+**Linear Regression**
+***Dependent=Price***
+***Independent=carat***
+```{r linearReg, echo=TRUE}
+datasetReg<-subset(datasetAnn, select = c(4,7))
+set.seed(123)
+```  
+***Split the data into training and test set***
+```{r splittingDataset2, echo=TRUE}
+split<-sample.split(datasetReg$price, SplitRatio = 0.8)
+training_set2<-subset(datasetReg, split==TRUE)
+test_set2<-subset(datasetReg, split==FALSE)
+```  
+
+***Scaling***
+```{r featureScaling2, echo=TRUE}
+training_set2[,1:2]<-scale(training_set2[,1:2])
+test_set2[,1:2]<-scale(test_set2[, 1:2])
+```  
+***Build Linear Model***
+```{r buildLinearModel, echo=TRUE}
+regressor2<- lm(formula=price~carat, data=training_set2)
+summary(regressor2)
+```  
+***predict on test data***
+```{r prediction, echo=TRUE}
+y_pred<-predict(regressor2, newdata = test_set2)
+head(y_pred)
+```  
+**Plot regression**
+```{r plotReg, echo=TRUE}
+r1<-ggplot(training_set2, aes(x=carat, y=price))+
+  geom_point()+geom_smooth(method="lm", se=FALSE)+
+  labs(title="TrainingData-Carat v/s Price")+
+  labs("Carat")+
+  labs("Price")
+
+
+r2<-ggplot()+
+  geom_point(aes(x=test_set2$carat, y=test_set2$price), color="red")+geom_line(aes(x=training_set2$carat, y=predict(regressor2, newdata = training_set2)))+
+  labs(title="TestData-Carat v/s Price")+
+  labs("Carat")+
+  labs("Price")
+
+grid.arrange(r1, r2, nrow=2, ncol=1)
+```
